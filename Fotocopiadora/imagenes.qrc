@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>imagenes/paisajes-0.jpg</file>
+        <file>imagenes/logo.png</file>
+        <file>imagenes/penguin.png</file>
+    </qresource>
+</RCC>
