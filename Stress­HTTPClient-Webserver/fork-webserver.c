@@ -51,11 +51,15 @@
 #define NOTOK_404   "HTTP/1.1 404 Not Found\nContent-Type:text/html\n\n"
 #define MESS_404    "<html><body><h1>FILE NOT FOUND</h1></body></html>"
 
+//Declaraciones de variables
 char delimitadores[2] = "/ " "";
 struct sockaddr_in serv_addr;
 static int nchildren;
 static pid_t *pids;
 
+/**
+	Funcion encargada de responder a las solicitudes de los clientes
+*/
 void funcion_hijo(int i, int listenfd, char* dir) {
 
 	int	conexion;
@@ -78,21 +82,17 @@ void funcion_hijo(int i, int listenfd, char* dir) {
 		conexion = accept(listenfd, (struct sockaddr*)NULL, NULL);
 		memset(sendBuff, '0', sizeof(sendBuff));
 		retcode = recv(conexion, req, 1025, 0);
-		if (retcode < 0)
-		{
+		if (retcode < 0){
 			printf("ERROR !!!\n");
 		}
-		else
-		{
+		else{
 			sscanf(req, "%s %s %s", get, path, http); //reads and parses the http get request
 			printf("\n\tProcessing request ...\n");
 			newpath = path + 1; //ignores the first slash
 			sprintf(hostpath,"%s/%s", dir, newpath);
-
 			fh = open(&hostpath[0], O_RDONLY, S_IREAD | S_IWRITE);
 
-			if (fh == -1)
-			{
+			if (fh == -1){
 				printf("Archivo %s no encontrado HTTP 404 \n", &newpath[0]);
 				strcpy(out_buf, NOTOK_404);
 				send(conexion, out_buf, strlen(out_buf), 0);
@@ -130,11 +130,9 @@ void funcion_hijo(int i, int listenfd, char* dir) {
 				send(conexion, out_buf, strlen(out_buf), 0);
 
 				buf_len = 1;
-				while (buf_len > 0)
-				{
+				while (buf_len > 0){
 					buf_len = read(fh, out_buf, 1024);
-					if (buf_len > 0)
-					{
+					if (buf_len > 0){
 						send(conexion, out_buf, buf_len, 0);
 					}
 				}
@@ -151,8 +149,11 @@ void funcion_hijo(int i, int listenfd, char* dir) {
 	free(newpath);
 }
 
-pid_t child_make(int i, int listenfd, char* dir)
-{
+/**
+	Funcion encargada de crear los server de acuerdo a "fork"
+*/
+pid_t child_make(int i, int listenfd, char* dir){
+
 	pid_t pid;
 	pid = fork();
 	if (pid == 0){
@@ -163,9 +164,10 @@ pid_t child_make(int i, int listenfd, char* dir)
 		return(pid);
 }
 
-
-void CerrarServidor()
-{
+/**
+	Funcion que sierra el servidor
+*/
+void *CerrarServidor(void *arg){
 	char salir;
 	scanf("%c", &salir);
 	if(salir == 'q'){
@@ -173,6 +175,9 @@ void CerrarServidor()
 	}
 }
 
+/**
+	Funcion del main del servidor con "fork"
+*/
 int main(int argc, char **argv)
 {
 	int listenfd, i, port;
@@ -195,7 +200,6 @@ int main(int argc, char **argv)
 	}
 
 	int nchildren = atoi(argv[2]);
-
 	pids = calloc(nchildren, sizeof(pid_t));
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	memset(&serv_addr, '0', sizeof(serv_addr));
@@ -205,7 +209,6 @@ int main(int argc, char **argv)
 	serv_addr.sin_port = htons((short)port);
 
 	bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-
 	pthread_t idHilo;
 	pthread_create(&idHilo, NULL, &CerrarServidor, NULL);
 
