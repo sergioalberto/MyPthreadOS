@@ -35,10 +35,10 @@
 #include <time.h>
 #include  <sys/time.h> 
 
+// Declaracion de variables
 char *archivo;
 char *ip;
 int num_threads;
-int num_ciclos;
 char * port;
 int *pthread_tim_wait;
 int contador = 0;
@@ -46,79 +46,70 @@ pthread_mutex_t bloqueo;
 
 typedef enum {FALSE, TRUE} bool;
 
+/**
+	Encargada de mandar las solicitudes a los servidores
+*/
 void *llamada(void * param)
 {
-	int ciclos;
-	struct timeval tinicio, tfinal;
-	int duration;
-	gettimeofday(&tinicio, NULL);
+	int sockfd, bindfd; // socket and bind file descriptors
+	char *ptr;
+	char getrequest[1024];
+	struct addrinfo hints, *res;
 
-	for (ciclos = 0; num_ciclos > ciclos; ciclos++) {
-		int sockfd, bindfd; // socket and bind file descriptors
-		char *ptr;
-		char getrequest[1024];
-		struct addrinfo hints, *res;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
 
-		memset(&hints, 0, sizeof hints);
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = SOCK_STREAM;
+	sprintf(getrequest, "GET %s HTTP/1.1\nHOST: %s\nConnection:close\n\n", archivo, ip);
 
-		sprintf(getrequest, "GET %s HTTP/1.1\nHOST: %s\nConnection:close\n\n", archivo, ip);
-
-		// gets linked list of results of a specified hostname
-		if ( getaddrinfo(ip, port, &hints, &res) != 0 ) {
-		    fprintf(stderr, "Host or IP not valid\n"); //quits program if the hostname was not found
-		    exit(0);
-		}
-
-		// creates a socket from hostname results and passes everything to a file descriptor
-		sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-
-		// bind the socket to the port passed to getaddrinfo()
-		bindfd = bind(sockfd, res->ai_addr, res->ai_addrlen);
-
-		// establish a connection and quits if there is a connection error
-		if ( connect(sockfd, res->ai_addr, res->ai_addrlen) != 0 ) {
-		    fprintf(stderr, "Connection error\n");
-		    exit(0);
-		}
-
-		int optval = 1;
-		setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
-
-		// writes the HTTP request to the socked file descriptor
-		write(sockfd, getrequest, strlen(getrequest));
-		bool flag = 1;
-
-		while(flag) {
-			char *s;
-			int i = 0;
-			s = (char *) malloc (1000*sizeof(char));
-			while(read(sockfd, s+i, 1) != 0){
-				if (i > 998){
-					break;
-				}
-				i++;
-			}
-			if(i<999) {
-				flag = 0;
-			}
-		}
-		close(sockfd);
+	// gets linked list of results of a specified hostname
+	if ( getaddrinfo(ip, port, &hints, &res) != 0 ) {
+	    fprintf(stderr, "Host or IP not valid\n"); //quits program if the hostname was not found
+	    exit(0);
 	}
 
-	gettimeofday(&tfinal, NULL);
-	sleep(1);
-	duration = ((tfinal.tv_usec - tinicio.tv_usec)  + ((tfinal.tv_sec - tinicio.tv_sec) * 1000000.0f));
+	// creates a socket from hostname results and passes everything to a file descriptor
+	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
-	if(contador < sizeof pthread_tim_wait) {
-		pthread_tim_wait[contador] = duration;
+	// bind the socket to the port passed to getaddrinfo()
+	bindfd = bind(sockfd, res->ai_addr, res->ai_addrlen);
+
+	// establish a connection and quits if there is a connection error
+	if ( connect(sockfd, res->ai_addr, res->ai_addrlen) != 0 ) {
+	    fprintf(stderr, "Connection error\n");
+	    exit(0);
 	}
+
+	int optval = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+
+	// writes the HTTP request to the socked file descriptor
+	write(sockfd, getrequest, strlen(getrequest));
+	bool flag = 1;
+
+	while(flag) {
+		char *s;
+		int i = 0;
+		s = (char *) malloc (1000*sizeof(char));
+		while(read(sockfd, s+i, 1) != 0){
+			if (i > 998){
+				break;
+			}
+			i++;
+		}
+		if(i<999) {
+			flag = 0;
+		}
+	}
+	close(sockfd);
 	printf("Termino un cliente\n");
+	pthread_exit(NULL);
 	return NULL;
 }
 
-
+/**
+	Main del cliente
+*/
 int main(int argc, char *argv[])
 {
 	if(argc != 7){
@@ -135,14 +126,9 @@ int main(int argc, char *argv[])
 	ip = dns;
 	port= argv[6];
 	num_threads = atoi(argv[2]);
-	num_ciclos = 1;
 
-
-	int creardor,cerrar, indicador;
-	int tiempoPromedio;
+	int creardor,cerrar;
 	pthread_t thread_id[num_threads];
-	double a[num_threads];
-	pthread_tim_wait = a;
 	
 	//creando hilos
 	printf(" Accediendo ...\n");
@@ -153,18 +139,10 @@ int main(int argc, char *argv[])
 	}
 	
 	//waits all threads to finish
-	contador = 0;
 	for(cerrar=0; cerrar < num_threads; cerrar++) {
 		pthread_join( thread_id[cerrar], NULL);
 	}
 
-	for(indicador= 0; indicador < num_threads; indicador++) {
-		pthread_mutex_lock (&bloqueo);
-		tiempoPromedio = tiempoPromedio + pthread_tim_wait[indicador];
-		pthread_mutex_unlock (&bloqueo);
-	}
-
-	tiempoPromedio = tiempoPromedio/ num_threads;
 	printf("Listo !!\n");
 
 	return 0;

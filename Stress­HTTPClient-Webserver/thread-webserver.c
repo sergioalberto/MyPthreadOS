@@ -43,6 +43,7 @@
 #include <dirent.h>
 #include <signal.h>
 
+// Definiciones
 #define BUF_SIZE 1024     // buffer
 #define OK_IMAGE    "HTTP/1.0 200 OK\nContent-Type:image/gif\n\n"
 #define OK_TEXT     "HTTP/1.0 200 OK\nContent-Type:text/html\n\n"
@@ -55,15 +56,15 @@
 #define NOTOK_404   "HTTP/1.0 404 Not Found\nContent-Type:text/html\n\n"
 #define MESS_404    "<html><body><h1>FILE NOT FOUND</h1></body></html>"
 
+
+// Declaracion de variables y estructuras
 char delimitadores[2] = "/ " "";
 struct sockaddr_in serv_addr;
 
-typedef struct
-{
+typedef struct {
     pthread_t thread_tid;      
     long    thread_count;     
-}
-Thread;
+} Thread;
 Thread *tptr; /* array of Thread structures; calloc'ed */
 
 int listenfd, nthreads;
@@ -73,6 +74,9 @@ pthread_mutex_t mlock;
 pthread_mutex_t mlock = PTHREAD_MUTEX_INITIALIZER;
 
 
+/**
+	Encargada de responder a las solicitudes de los clientes
+*/
 void *thread_main(void *arg) {
 
 	int  connfd_aux;
@@ -160,7 +164,6 @@ void *thread_main(void *arg) {
 		printf("\n\tEnd of tranmission\n");
 		pthread_mutex_unlock(&mlock);
 		close(connfd_aux);
-
 		tptr[(int) arg].thread_count++;
 	}
 	free(req);
@@ -168,13 +171,19 @@ void *thread_main(void *arg) {
 	free(newpath);
 }
 
+/**
+	Crea los hilos de servidor
+*/
 void thread_make(int i)
 {
 	pthread_create(&tptr[i].thread_tid, NULL, &thread_main, (void *) i);
 	return;                    
 }
 
-void CerrarServidor()
+/**
+	Cierra el servidor
+*/
+void *CerrarServidor(void *arg)
 {
 	char salir;
 	scanf("%c", &salir);
@@ -183,25 +192,28 @@ void CerrarServidor()
 	}
 }
 
+/**
+	Main del servidor con threads
+*/
 int main(int argc, char **argv)
 {
 	int i, port;
 	void sig_int(int), thread_make(int);
 
-		if (argc != 7) {
+	if (argc != 7) {
 		fprintf(stderr, "Usage: -n <N-forks> -w <path-root> -p <port>\n");
 		exit(1);
 	}
 
-	dir = argv[4];
-	port = atoi(argv[6]);
+	dir = argv[4]; // Dirrecion
+	port = atoi(argv[6]); // puerto
 
 	if (opendir(dir) == NULL) {
 		fprintf(stderr, "Directory not found\n");
 		exit(1);
 	}
 
-	int nthreads = atoi(argv[2]);
+	int nthreads = atoi(argv[2]); // Numero de threads
 
 	tptr = calloc(nthreads, sizeof(Thread));
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -210,7 +222,7 @@ int main(int argc, char **argv)
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serv_addr.sin_port = htons(port);
-
+        
 	pthread_t idHilo;
 	pthread_create(&idHilo, NULL, &CerrarServidor, NULL);
 
