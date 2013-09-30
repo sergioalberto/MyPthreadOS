@@ -1,69 +1,78 @@
 /* ------------------------------------------------------- */
-/* PROGRAM  mtp.c:                                         */
-/*   This program shows a poorman's multithreaded kernel   */
-/* using setjmp() and longjmp().                           */
+/* My_Pthreads                                             */
+/* Implemantacion de la Biblioteca Pthreads                */
 /*                                                         */
-/*                                       Ching-Kuang Shene */
-/*                                         August 31, 1998 */
+/* El código que se tomó de base es de caracter libre,     */
+/* desarrollado por Ching-Kuang Shene el 31 de agosto, 1998*/
+/*                                                         */
 /* ------------------------------------------------------- */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <setjmp.h>
+/* ------------------------------------------------------- */
+/*   Includes utilizados en la realizacion de my_pthread   */
+/* ------------------------------------------------------- */
+#include  <stdio.h>
+#include  <stdlib.h>
+#include  <setjmp.h>
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
 
-#define   MAX_COUNT   5
+/* ------------------------------------------------------- */
+/*Valores estáticos utilizados en la ejecución del programa*/
+/* ------------------------------------------------------- */
 #define MAX_TICKETS 100
 
-int counter1;
-int counter2;
-int counter3;
-int counter4;
+/* ------------------------------------------------------- */
+/*                  Estructuras de Datos                   */
+/* ------------------------------------------------------- */
+
+typedef struct PCB_NODE  *PCB_ptr; /* puntero al PCB       */
+
+typedef struct PCB_NODE {          /* un PCB:              */
+     jmp_buf   Environment;        /*   jump buffer        */
+     int       Name;               /*   nombre del thread  */
+     PCB_ptr   Next;               /*   próxima PCB        */
+     int       Estado;             /* actividad del thread */
+}  PCB;
+
+typedef struct THREAD_NODE *thread_ptr;/*puntero a un thread*/
+
+typedef struct THREAD_NODE {       /* un thread:           */
+     PCB_ptr   my_pcb;             /*   puntero a su PCB   */
+     thread_ptr Next;              /*   proximo thread     */
+     int       Name;               /*   nombre del thread  */
+} my_pthread;
+
+typedef struct MUTEX {             /* un mutex:            */
+    int        lock;               /*   estado del mutex   */
+    thread_ptr owner;              /*   thread poseedor    */
+} my_mutex;
+
+/* ------------------------------------------------------- */
+/*                     Datos Externos                      */
+/* ------------------------------------------------------- */
+
+jmp_buf   MAIN;                    /* jump buffer al  main */
+jmp_buf   SCHEDULER;               /* para el scheduler    */
+
+PCB_ptr   Head;                    /* inicio de los PCBs   */
+PCB_ptr   Current;                 /* PCB actual           */
+PCB_ptr   work;                    /* variable de trabajo  */
+
+thread_ptr Head_T;                 /* inicio de los threads*/
+thread_ptr Current_T;              /* thread actual        */
+thread_ptr work_T;                 /* variable de trabajo  */
+
+/* ------------------------------------------------------- */
+/*         Variables utilizadas por el Scheduler           */
+/* ------------------------------------------------------- */
 int contador_t = 0;
 int non_match_up = 0;
 int join = 0;
 
 /* ------------------------------------------------------- */
-/*                     Data Structures                     */
-/* ------------------------------------------------------- */
-
-typedef struct PCB_NODE  *PCB_ptr; /* pointer to a PCB     */
-
-typedef struct PCB_NODE {          /* a PCB:               */
-     jmp_buf   Environment;        /*   jump buffer        */
-     int       Name;               /*   thread name: unused*/
-     PCB_ptr   Next;               /*   next PCB           */
-     int       Estado;
-}  PCB;    
-
-typedef struct THREAD_NODE *thread_ptr;
-
-typedef struct THREAD_NODE {
-     PCB_ptr   my_pcb;
-     thread_ptr Next;
-     int       Name;
-} my_pthread;
-
-/* ------------------------------------------------------- */
-/*                      External Data                      */
-/* ------------------------------------------------------- */
-
-jmp_buf   MAIN;                    /* jump buffer for main */
-jmp_buf   SCHEDULER;               /* for the scheduler    */
-
-PCB_ptr   Head;                    /* head of the PCBs     */
-PCB_ptr   Current;                 /* current executing    */
-PCB_ptr   work;                    /* working variable     */
-
-thread_ptr Head_T;
-thread_ptr Current_T;
-thread_ptr work_T;
-
-/* ------------------------------------------------------- */
-/*                    Macro THREAD_CREATE                  */
-/*   This macro creates a thread.                          */
+/*                  Macro MY_THREAD_CREATE                 */
+/*   Este macro crea un thread.                            */
 /* ------------------------------------------------------- */
 
 #define   MY_THREAD_CREATE(function, name) {                \
@@ -79,11 +88,14 @@ thread_ptr work_T;
                             printf("Maximo de tickets\n");  \
                     }                                       \
                }
+
+
                     
 /* ------------------------------------------------------- */
-/*                 Macro THREAD_INIT                       */
-/*   This macro allocates a PCB for a thread and puts it   */
-/*   into the scheduling chain, which is a circular list.  */
+/*                 Macro MY_THREAD_INIT                    */
+/*   Este macro aloja el nuevo thread y su respectiva PCB  */
+/*   y los introduce en la cadena de scheduling, una lista */
+/*   circular.                                             */
 /* ------------------------------------------------------- */
 
 #define   MY_THREAD_INIT(name)     {                        \
@@ -111,6 +123,11 @@ thread_ptr work_T;
                          longjmp(MAIN, 1);                  \
                }
 
+/* ------------------------------------------------------- */
+/*                 Macro MY_THREAD_EXIT                    */
+/*  Este macro coloca el thread actual en estado innactivo */
+/* ------------------------------------------------------- */
+
 #define    MY_THREAD_EXIT(name)    {                        \
                   Current->Estado = 1;                      \
                   MY_THREAD_YIELD(name);                    \
@@ -118,10 +135,10 @@ thread_ptr work_T;
 }
                          
 /* ------------------------------------------------------- */
-/*                  Macro THREAD_YIELD                     */
-/*   This macro simulates yielding control by jumping      */
-/*   into the scheduler.  The scheduler picks the next     */
-/*   thread to run.                                        */
+/*                 Macro MY_THREAD_YIELD                   */
+/*   Este macro simular el paso del CPU de un thread a     */
+/*   vía scheduler. El scheduler será quien seleccione     */
+/*   cual será el siguiente hilo a ejecutarse.             */
 /* ------------------------------------------------------- */
 
 #define   MY_THREAD_YIELD(name)    {                        \
@@ -129,13 +146,21 @@ thread_ptr work_T;
                     longjmp(SCHEDULER, 1);                  \
                }
 
+/* ------------------------------------------------------- */
+/*                 Macro MY_THREAD_JOIN                    */
+/*   Macro meramente ilustrativo. Su trabajo internamente  */
+/*   es realizado por el Scheduler. Bloquea el thread      */
+/*   actual hasta que el thread objetivo llegue a su final */
+/* ------------------------------------------------------- */
+
 #define   MY_THREAD_JOIN() {                                \
                      join = 1;                              \
                }                                            \
 
 /* ------------------------------------------------------- */
-/* FUNCTION  funct_1():                                    */
-/*   A function to be run as a thread.                     */
+/* FUNCION  getThread():                                   */
+/* Encargada de realizar búsquedas por un thread especifico*/
+/* según sea el numero identificador del mismo             */
 /* ------------------------------------------------------- */
 
 thread_ptr getThread(int name)
@@ -162,6 +187,11 @@ thread_ptr getThread(int name)
     return NULL;
 }
 
+/* ------------------------------------------------------- */
+/* FUNCION  MY_THREAD_getARG():                            */
+/* Encargada de retornar los atributos del PCB del thread  */
+/* ------------------------------------------------------- */
+
 PCB_ptr MY_THREAD_getARG(thread_ptr thread)
 {
     if(thread != NULL)
@@ -170,75 +200,80 @@ PCB_ptr MY_THREAD_getARG(thread_ptr thread)
         return NULL;
 }
 
-void  funct_1(int  name)
+/* ------------------------------------------------------- */
+/* FUNCION  MY_MUTEX_INIT():                               */
+/* Encargada inicializar en 0 el lock del mutex objetivo   */
+/* ------------------------------------------------------- */
+
+void  MY_MUTEX_INIT(my_mutex* mutex)
 {
-    int  i;
-     
-    for(counter1 = 0;counter1 < MAX_COUNT-1;counter1++) {/* running the thread   */
-         for (i = 1; i <= MAX_COUNT; i++)
-              printf("funct_1() executing\n");
-         MY_THREAD_YIELD(name);      /* yield control        */
+    mutex->lock=0;                       
+}
+
+/* ------------------------------------------------------- */
+/* FUNCTION  MY_MUTEX_LOCK():                               */
+/* Encargada setear en 1 el lock del mutex objetivo en caso*/
+/* de que el valor del lock sea 0 y asignarle el mutex al  */  
+/* thread que lo solicitó. Si el valor del lock es 1       */
+/* inicialmente, el hilo cederá el CPU ya que no puede     */
+/* entrar a la región crítica del programa.                */
+/* ------------------------------------------------------- */
+
+void  MY_MUTEX_LOCK(my_mutex* mutex)
+{
+    while(1)
+    {
+        if(mutex->lock==1)
+        {
+            longjmp(SCHEDULER, 1);
+        }
+
+        mutex->lock==1;
+        mutex->owner=Current_T;
+        break;
     }
-    MY_THREAD_EXIT(name);
 }
-                              
+
 /* ------------------------------------------------------- */
-/* FUNCTION  funct_2():                                    */
-/*   A function to be run as a thread.                     */
+/* FUNCION  MY_MUTEX_UNLOCK():                             */
+/* Encargada liberar el mutex objetivo del thread asignado */
+/* y resetear su lock a un valor de 0                      */
 /* ------------------------------------------------------- */
 
-void  funct_2(int  name)
+void MY_MUTEX_UNLOCK(my_mutex* mutex)
 {
-     int  i;
-     
-     for(counter2 = 0;counter2 < MAX_COUNT-1;counter2++) {
-          for (i = 1; i <= MAX_COUNT; i++)
-               printf("   funct_2() executing\n");
-          MY_THREAD_YIELD(name);
-     }
-     MY_THREAD_EXIT(name);
+    mutex->lock=0;
+    mutex->owner=NULL;
 }
-                              
+
 /* ------------------------------------------------------- */
-/* FUNCTION  funct_3():                                    */
-/*   A function to be run as a thread.                     */
+/* FUNCION  MY_MUTEX_TRYLOCK():                            */
+/* Retorna el valor del lock del mutex objetivo            */
 /* ------------------------------------------------------- */
 
-void  funct_3(int  name)
+int MY_MUTEX_TRYLOCK(my_mutex* mutex)
 {
-     int  i;
-     
-     for(counter3 = 0;counter3 < MAX_COUNT-1;counter3++) {
-          for (i = 1; i <= MAX_COUNT; i++)
-               printf("      funct_3() executing\n");
-          MY_THREAD_YIELD(name);
-     }
-     MY_THREAD_EXIT(name);
+    return mutex->lock;
 }
-                              
+
 /* ------------------------------------------------------- */
-/* FUNCTION  funct_4():                                    */
-/*   A function to be run as a thread.                     */
+/* FUNCION  MY_MUTEX_DESTROY():                            */
+/* Libera la memoria que estaba siendo utilizada por el    */
+/* mutex objetivo                                          */
 /* ------------------------------------------------------- */
 
-void  funct_4(int  name)
+void MY_MUTEX_DESTROY(my_mutex* mutex)
 {
-     int  i;
-     
-     for(counter4 = 0;counter4 < MAX_COUNT;counter4++) {
-          for (i = 1; i <= MAX_COUNT; i++)
-               printf("         funct_4() executing\n");
-          MY_THREAD_YIELD(name);
-     }
-     MY_THREAD_EXIT(name);
+    free(mutex);
 }
 
-                              
 /* ------------------------------------------------------- */
-/* FUNCTION  Scheduler():                                  */
-/*   The scheduler is first called by the main program to  */
-/* setup an entry point.  Then, it is re-entered through   */
-/* a longjmp() from the THREAD_YIELD() macro.              */
+/* FUNCION  Scheduler():                                   */
+/* El Scheduler es primero llmado por el main del programa */
+/* para setear un punto de inicio. Luego se reingresa a él */
+/* a través del macro MY_THREAD_YIELD. En esta función se  */
+/* realiza el paso de prioridad entre los hilos que tengan */
+/* tiquetes para poder ser ejecutados.                     */
 /* ------------------------------------------------------- */
 
 void Scheduler(void)
@@ -255,7 +290,6 @@ void Scheduler(void)
      else
      {
         non_match_up++;
-        printf("non_match_up es: %d\n",non_match_up);
         if(contador_t>non_match_up)
             longjmp(SCHEDULER, 1);
         else
@@ -263,34 +297,4 @@ void Scheduler(void)
             MY_THREAD_JOIN();
         }
      }
-}
-                         
-/* ------------------------------------------------------- */
-/*              The main program starts here               */
-/*   The main program calls each threads, allowing then to */
-/*   initializing themselves.  Then, calls the scheduler.  */
-/*   Finally, jumps to the scheduler to start the system.  */
-/* ------------------------------------------------------- */
-
-int main(void)
-{
-     Head = Current = NULL;        /* initialize pointers  */
-     
-     MY_THREAD_CREATE(funct_1, 1);    /* initialize threads   */
-     MY_THREAD_CREATE(funct_2, 2);
-     MY_THREAD_CREATE(funct_3, 3);
-     MY_THREAD_CREATE(funct_4, 4);
-     
-     if (setjmp(MAIN) == 0)        /* initialize scheduler */   
-         Scheduler();
-     
-     if(!join)
-        longjmp(SCHEDULER,1);         /* start scheduler      */
-     
-     
-     PCB_ptr control = MY_THREAD_getARG(getThread(3));
-         
-     printf("El hilo que encontro tiene por nombre %d y su estado es %d\n",control->Name,control->Estado);
-     printf("termine de ejecutar");
-     return 0;
 }

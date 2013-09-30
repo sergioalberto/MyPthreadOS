@@ -1,7 +1,7 @@
 CC=gcc
 THREAD-WEBSERVER= thread-webserver.c
 
-OUTPUT=stress-client thread-webserver photocopier
+OUTPUT=stress-client thread-webserver
 
 all: $(OUTPUT)
 
@@ -10,9 +10,6 @@ thread-webserver: $(THREAD-WEBSERVER)
 	
 stress-client: stress-client.c
 	$(CC) -o stress-client stress-client.c mypthread.c
-
-photocopier: photocopier.c
-	$(CC) -pthread -o photocopier photocopier.c 
 	
 clean:
 	rm -f $(OUTPUT)

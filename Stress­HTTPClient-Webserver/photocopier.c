@@ -19,12 +19,12 @@
 //
 //#########################################################################
 
-#include "mypthread.h"
+//                            gcc -pthread -o test photocopier.c
+
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
-
-//			gcc -o test photocopier.c mypthread.c
 
 typedef int buffer_item;
 #define BUFFER_SIZE 19
@@ -43,9 +43,10 @@ sem_t cFull;
 sem_t mutex;
 
 /* Threads */
-//pthread_t tid; /* Thread ID */
-//pthread_attr_t attr; /* Thread attributes */
+pthread_t tid; /* Thread ID */
+pthread_attr_t attr; /* Thread attributes */
 
+/* funtions*/
 void *producer(void *param);
 void *consumer(void *param);
 void init();
@@ -77,20 +78,11 @@ main(int argc, char *argv[]){
 	init();
 
 	datasClient _datasClient[argarray];
-	
-	//#######################################################################
-	contador_t = 0;
-	join = 0;
-	Head = Current = NULL;        /* initialize pointers  */
-
-	if (setjmp(MAIN) == 0)        /* initialize scheduler */   
-        	Scheduler();
-   	//#######################################################################
 
 	/* Create the consumer threads */
-	MY_THREAD_CREATE(consumer, NULL);   
+	pthread_create(&tid, &attr, consumer, NULL);   
 
-	//pthread_t tid1[argarray]; /* Thread ID *
+	pthread_t tid1[argarray]; /* Thread ID *
 
 	/* Do actual work from this point forward */
 	/* Create the producer threads */
@@ -102,21 +94,16 @@ main(int argc, char *argv[]){
 		}else{
 			_datasClient[c1].IdClient = 1;
 		}
-		MY_THREAD_CREATE(producer, (void*)&_datasClient[c1]);
+		pthread_create(&tid1[c1], &attr, producer, (void*)&_datasClient[c1]);
 		printf("Creating client #%d\n", c1);    
 		thread ++;
 	}
 
-	//########################################################################
-	if(!join)
-		longjmp(SCHEDULER,1);         /* start scheduler      */
-	//########################################################################
 
 	/* Ending it */
 	sleep(20);
 
 	printf("Production complete.\n");
-
 }
 
 /**
@@ -126,7 +113,7 @@ void init() {
 
 	int c2;
 	sem_init(&mutex, 0, 1); /* Initialize mutex lock */
-	//pthread_attr_init(&attr); /* Initialize pthread attributes to default */
+	pthread_attr_init(&attr); /* Initialize pthread attributes to default */
 	sem_init(&cFull, 0, 0); /* Initialize full semaphore */
 	sem_init(&cEmpty, 0, BUFFER_SIZE); /* Initialize empty semaphore */
 	cg = 0; /* Initialize global counter */ 
