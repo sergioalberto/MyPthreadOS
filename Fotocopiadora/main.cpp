@@ -1,11 +1,11 @@
 #include <QtGui/QApplication>
 #include "mainwindow.h"
-#include "fotocopiadora.h"
+#include "photocopier.h"
 
 int main(int argc, char *argv[])
 {
-    Fotocopiadora _Fotocopiadora;
-    _Fotocopiadora.initAll();
+    photocopier _photocopier;
+    //_Fotocopiadora.initAll();
 
     QApplication a(argc, argv);
     MainWindow w;

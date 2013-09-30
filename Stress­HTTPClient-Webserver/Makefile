@@ -15,7 +15,8 @@ thread-webserver: $(THREAD-WEBSERVER)
 	$(CC) -$(FLAGS) $(THREAD-WEBSERVER) -o thread-webserver
 	
 stress-client: stress-client.c
-	$(CC) -$(FLAGS) stress-client.c -o stress-client
+	$(CC) -o stress-client stress-client.c mypthread.c
+	##$(CC) -$(FLAGS) stress-client.c -o stress-client
 	
 clean:
 	rm -f $(OUTPUT)

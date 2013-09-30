@@ -1,6 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "fotocopiadora.h"
+#include "photocopier.h"
 #include <iostream>
 #include <QTimer>
 
@@ -36,21 +36,22 @@ void MainWindow::on_pushButton_clicked()
 {
     int dato =(int) ui->spinBox2->value();
     //cout <<dato<< endl;
-    createClient(1,dato);
+    createClients(1,dato);
 }
 
 void MainWindow::on_pushButton1_clicked()
 {
     int dato =(int) ui->spinBox->value();
-    createClient(0,dato);
+    createClients(0,dato);
+
 }
 
 void MainWindow::update()
 {
-    QString studens = QString::number(getCountStudents());
+    QString studens = QString::number(getStudents());
     ui->label_6->setText(studens); // Studens
 
-    QString teacher = QString::number(getCountTeacher());
+    QString teacher = QString::number(getTeacher());
     ui->label_7->setText(teacher); // Theacher
 }
 

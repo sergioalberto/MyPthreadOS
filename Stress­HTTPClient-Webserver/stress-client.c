@@ -29,20 +29,19 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <time.h>
 #include  <sys/time.h> 
+
+#include "mypthread.h"
 
 // Declaracion de variables
 char *archivo;
 char *ip;
 int num_threads;
 char * port;
-int *pthread_tim_wait;
 int contador = 0;
-pthread_mutex_t bloqueo;
 
 typedef enum {FALSE, TRUE} bool;
 
@@ -103,7 +102,7 @@ void *llamada(void * param)
 	}
 	close(sockfd);
 	printf("Termino un cliente\n");
-	pthread_exit(NULL);
+	MY_THREAD_EXIT(NULL);
 	return NULL;
 }
 
@@ -128,20 +127,34 @@ int main(int argc, char *argv[])
 	num_threads = atoi(argv[2]);
 
 	int creardor,cerrar;
-	pthread_t thread_id[num_threads];
-	
+	//pthread_t thread_id[num_threads];
+	//#######################################################################
+	contador_t = 0;
+	join = 0;
+	Head = Current = NULL;        /* initialize pointers  */
+
+	if (setjmp(MAIN) == 0)        /* initialize scheduler */   
+        	Scheduler();
+   	//#######################################################################
 	//creando hilos
 	printf(" Accediendo ...\n");
 	for(creardor=0; creardor < num_threads; creardor++){
 		printf("Conexión: %d\n",creardor);
-		pthread_create( &thread_id[creardor], NULL, llamada, NULL );
+		MY_THREAD_CREATE(llamada, &creardor);
 		sleep(1);
 	}
 	
+	//########################################################################
+	if(!join)
+		longjmp(SCHEDULER,1);         /* start scheduler      */
+	//########################################################################
 	//waits all threads to finish
+/**
 	for(cerrar=0; cerrar < num_threads; cerrar++) {
 		pthread_join( thread_id[cerrar], NULL);
 	}
+*/
+	MY_THREAD_JOIN();
 
 	printf("Listo !!\n");
 

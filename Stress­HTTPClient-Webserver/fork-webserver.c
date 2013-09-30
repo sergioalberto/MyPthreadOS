@@ -209,8 +209,8 @@ int main(int argc, char **argv)
 	serv_addr.sin_port = htons((short)port);
 
 	bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-	pthread_t idHilo;
-	pthread_create(&idHilo, NULL, &CerrarServidor, NULL);
+	//pthread_t idHilo;
+	//pthread_create(&idHilo, NULL, &CerrarServidor, NULL);
 
 	for (i = 0; i < nchildren; i++)
 		pids[i] = child_make(i, listenfd, dir);

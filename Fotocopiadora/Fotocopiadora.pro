@@ -13,10 +13,10 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    fotocopiadora.cpp
+    photocopier.cpp
 
 HEADERS  += mainwindow.h \
-    fotocopiadora.h
+    photocopier.h
 
 FORMS    += mainwindow.ui
 
