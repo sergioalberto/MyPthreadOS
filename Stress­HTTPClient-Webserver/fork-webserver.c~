@@ -2,7 +2,7 @@
 //
 // This program is used to test servers, and prints some statistical info
 //
-// Author: Sergio GQ and Edgar Rojas
+// Author: Sergio GQ
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,74 +20,54 @@
 //#########################################################################
 
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <netinet/in.h>
-#include <netdb.h>
+#include <arpa/inet.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <arpa/inet.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <fcntl.h>         
+#include <string.h>
+#include <sys/types.h>
+#include <time.h> 
+#include <sys/types.h> 
+#include <unistd.h> 
+#include <fcntl.h>          
 #include <sys/stat.h>      
-#include <errno.h>
-
+#include <errno.h>	
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <netdb.h>
 #include <dirent.h>
 #include <signal.h>
 
-#include "mypthread.h"
-
-// Definiciones
-#define BUF_SIZE 1024     // buffer
-#define OK_IMAGE    "HTTP/1.0 200 OK\nContent-Type:image/gif\n\n"
-#define OK_TEXT     "HTTP/1.0 200 OK\nContent-Type:text/html\n\n"
+#define OK_IMAGE    "HTTP/1.1 200 OK\nContent-Type:image/gif\n\n"
+#define OK_TEXT     "HTTP/1.1 200 OK\nContent-Type:text/html\n\n"
 #define OK_PDF     "HTTP/1.1 200 OK\nContent-Type:application/pdf\n\n"
 #define OK_VIDEO     "HTTP/1.1 200 OK\nContent-Type:video/x-msvideo\n\n"
 #define OK_ISO     "HTTP/1.1 200 OK\nContent-Type:application/x-cd-image\n\n"
 #define OK_EXE     "HTTP/1.1 200 OK\nContent-Type:application/x-ms-dos-executable\n\n"
 #define OK_BIN     "HTTP/1.1 200 OK\nContent-Type:application/octet-stream\n\n"
 #define OK_SWF     "HTTP/1.1 200 OK\nContent-Type:application/x-shockwave-flash\n\n"
-#define NOTOK_404   "HTTP/1.0 404 Not Found\nContent-Type:text/html\n\n"
+#define NOTOK_404   "HTTP/1.1 404 Not Found\nContent-Type:text/html\n\n"
 #define MESS_404    "<html><body><h1>FILE NOT FOUND</h1></body></html>"
 
-
-// Declaracion de variables y estructuras
+//Declaraciones de variables
 char delimitadores[2] = "/ " "";
 struct sockaddr_in serv_addr;
+static int nchildren;
+static pid_t *pids;
 
 /**
-typedef struct {
-    pthread_t thread_tid;      
-    long    thread_count;     
-} Thread;
-Thread *tptr; //array of Thread structures; calloc'ed
+	Funcion encargada de responder a las solicitudes de los clientes
 */
+void funcion_hijo(int i, int listenfd, char* dir) {
 
-int listenfd, nthreads;
-char* dir;
-socklen_t addrlen;
-//pthread_mutex_t mlock;
-//pthread_mutex_t mlock = PTHREAD_MUTEX_INITIALIZER;
-
-
-/**
-	Encargada de responder a las solicitudes de los clientes
-*/
-void *thread_main(void *arg) {
-
-	int  connfd_aux;
+	int	conexion;
 	char *file_name, *req, *newpath;
 	char get[3], *path, http[9];
 	char sendBuff[1025];
 	char out_buf[1025];
-	unsigned int fh;                    
+	unsigned int fh;                        
 	unsigned int buf_len;
 	unsigned int retcode;
 	char hostpath[1024];
@@ -96,41 +76,36 @@ void *thread_main(void *arg) {
 	path = (char*)malloc(1024*sizeof(char));
 	newpath = (char*)malloc(1024*sizeof(char));
 
-	printf("Thread %d starting\n", (int) arg);
+	printf("Hijo %ld inicia\n", (long) getpid());
 	for ( ; ; ) {
-
-		//pthread_mutex_lock(&mlock);
-		printf("Escucho %d \n", (int) arg);
-		connfd_aux = accept(listenfd, (struct sockaddr*)NULL, NULL);
+		listen(listenfd, 1000); //listening to a maximum of 1000 connections
+		conexion = accept(listenfd, (struct sockaddr*)NULL, NULL);
 		memset(sendBuff, '0', sizeof(sendBuff));
-		retcode = recv(connfd_aux, req, 1025, 0);
-
-		if (retcode < 0) {
-			printf("Recv error detected ...\n");
+		retcode = recv(conexion, req, 1025, 0);
+		if (retcode < 0){
+			printf("ERROR !!!\n");
 		}
-		else { 
+		else{
 			sscanf(req, "%s %s %s", get, path, http); //reads and parses the http get request
-			printf("\n\tProcessing request...\n");
+			printf("\n\tProcessing request ...\n");
 			newpath = path + 1; //ignores the first slash
 			sprintf(hostpath,"%s/%s", dir, newpath);
-
 			fh = open(&hostpath[0], O_RDONLY, S_IREAD | S_IWRITE);
 
-			if (fh == -1) {
-				printf("File %s not found - sending an HTTP 404 \n", &newpath[0]);
+			if (fh == -1){
+				printf("Archivo %s no encontrado HTTP 404 \n", &newpath[0]);
 				strcpy(out_buf, NOTOK_404);
-				send(connfd_aux, out_buf, strlen(out_buf), 0);
+				send(conexion, out_buf, strlen(out_buf), 0);
 				strcpy(out_buf, MESS_404);
-				send(connfd_aux, out_buf, strlen(out_buf), 0);
+				send(conexion, out_buf, strlen(out_buf), 0);
 			}
-			else
-			{
-				printf("File %s is being sent \n", &newpath[0]);
-				if ((strstr(newpath, ".jpg") != NULL)||(strstr(newpath, ".gif") != NULL)||(strstr(newpath, ".png") != NULL))
-				{
+			else {
+
+				printf("Archivo %s enviandose ... \n", &newpath[0]);
+				if ((strstr(newpath, ".jpg") != NULL)||(strstr(newpath, ".gif") != NULL)||(strstr(newpath, ".png") != NULL) ){
 					strcpy(out_buf, OK_IMAGE);
 				}
-				else if ((strstr(newpath, ".pdf") != NULL)) {
+				else if ((strstr(newpath, ".pdf") != NULL)){
 					strcpy(out_buf, OK_PDF);
 				}
 				else if ((strstr(newpath, ".avi") != NULL)){
@@ -148,26 +123,26 @@ void *thread_main(void *arg) {
 				else if ((strstr(newpath, ".bin") != NULL)){
 					strcpy(out_buf, OK_BIN);
 				}
-				else {
+				else{
 					strcpy(out_buf, OK_TEXT);
 				}
 
-				send(connfd_aux, out_buf, strlen(out_buf), 0);
+				send(conexion, out_buf, strlen(out_buf), 0);
+
 				buf_len = 1;
-				while (buf_len > 0)
-				{
-					buf_len = read(fh, out_buf, BUF_SIZE);
-					if (buf_len > 0) {
-						send(connfd_aux, out_buf, buf_len, 0);
+				while (buf_len > 0){
+					buf_len = read(fh, out_buf, 1024);
+					if (buf_len > 0){
+						send(conexion, out_buf, buf_len, 0);
 					}
 				}
-				close(fh);       // close the file
-			}
+
+				close(fh);      
+				printf("\n\tEnd of tranmission\n");
+			}	
+		    
 		}
-		printf("\n\tEnd of tranmission\n");
-		//pthread_mutex_unlock(&mlock);
-		close(connfd_aux);
-		//tptr[(int) arg].thread_count++;
+		close(conexion);
 	}
 	free(req);
 	free(path);
@@ -175,19 +150,24 @@ void *thread_main(void *arg) {
 }
 
 /**
-	Crea los hilos de servidor
+	Funcion encargada de crear los server de acuerdo a "fork"
 */
-void thread_make(int i)
-{
-	MY_THREAD_CREATE(&thread_main, NULL);
-	return;                    
+pid_t child_make(int i, int listenfd, char* dir){
+
+	pid_t pid;
+	pid = fork();
+	if (pid == 0){
+		funcion_hijo(i, listenfd, dir);
+		return(pid);
+	}
+	else
+		return(pid);
 }
 
 /**
-	Cierra el servidor
+	Funcion que sierra el servidor
 */
-void *CerrarServidor(void *arg)
-{
+void *CerrarServidor(void *arg){
 	char salir;
 	scanf("%c", &salir);
 	if(salir == 'q'){
@@ -196,67 +176,45 @@ void *CerrarServidor(void *arg)
 }
 
 /**
-	Main del servidor con threads
+	Funcion del main del servidor con "fork"
 */
 int main(int argc, char **argv)
 {
-	int i, port;
-	void sig_int(int), thread_make(int);
+	int listenfd, i, port;
+	socklen_t addrlen;
+	void sig_int(int);
+	pid_t child_make(int, int, char*);
+	char* dir;
 
 	if (argc != 7) {
-		fprintf(stderr, "Usage: -n <N-forks> -w <path-root> -p <port>\n");
+		fprintf(stderr, "Usage: -n <N-threads> -w <path-root> -p <port>\n");
 		exit(1);
 	}
 
-	dir = argv[4]; // Dirrecion
-	port = atoi(argv[6]); // puerto
+	dir = argv[4];
+	port = atoi(argv[6]);
 
 	if (opendir(dir) == NULL) {
 		fprintf(stderr, "Directory not found\n");
 		exit(1);
 	}
 
-	int nthreads = atoi(argv[2]); // Numero de threads
-
-	//tptr = calloc(nthreads, sizeof(Thread));
+	int nchildren = atoi(argv[2]);
+	pids = calloc(nchildren, sizeof(pid_t));
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	memset(&serv_addr, '0', sizeof(serv_addr));
 
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(port);
-        
+	serv_addr.sin_port = htons((short)port);
+
+	bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
 	//pthread_t idHilo;
 	//pthread_create(&idHilo, NULL, &CerrarServidor, NULL);
 
-	bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-	listen(listenfd, 1000); //listening to a maximum of 1000 connections
-	
-	//pthread_t thread_id[num_threads];
-	//#######################################################################
-	contador_t = 0;
-	join = 0;
-	Head = Current = NULL;        /* initialize pointers  */
+	for (i = 0; i < nchildren; i++)
+		pids[i] = child_make(i, listenfd, dir);
 
-	if (setjmp(MAIN) == 0)        /* initialize scheduler */   
-        	Scheduler();
-   	//#######################################################################
-
-
-	for (i = 0;  i < nthreads; i++)
-		thread_make(i);   
-    
-
-	//########################################################################
-	if(!join)
-		longjmp(SCHEDULER,1);         /* start scheduler      */
-	//########################################################################
-
-	MY_THREAD_JOIN();
-
-	for ( ; ; )
-		pause();                
+	for ( ; ; ) 
+		;
 }
-
-
-

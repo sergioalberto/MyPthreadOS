@@ -2,7 +2,7 @@
 //
 // This program is used to test servers, and prints some statistical info
 //
-// Author: Sergio GQ
+// Author: Sergio GQ and Edgar Rojas
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
