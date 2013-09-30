@@ -32,7 +32,6 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <pthread.h>
 #include <fcntl.h>         
 #include <sys/stat.h>      
 #include <errno.h>
@@ -42,6 +41,8 @@
 #include <netdb.h>
 #include <dirent.h>
 #include <signal.h>
+
+#include "mypthread.h"
 
 // Definiciones
 #define BUF_SIZE 1024     // buffer
@@ -61,17 +62,19 @@
 char delimitadores[2] = "/ " "";
 struct sockaddr_in serv_addr;
 
+/**
 typedef struct {
     pthread_t thread_tid;      
     long    thread_count;     
 } Thread;
-Thread *tptr; /* array of Thread structures; calloc'ed */
+Thread *tptr; //array of Thread structures; calloc'ed
+*/
 
 int listenfd, nthreads;
 char* dir;
 socklen_t addrlen;
-pthread_mutex_t mlock;
-pthread_mutex_t mlock = PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t mlock;
+//pthread_mutex_t mlock = PTHREAD_MUTEX_INITIALIZER;
 
 
 /**
@@ -96,7 +99,7 @@ void *thread_main(void *arg) {
 	printf("Thread %d starting\n", (int) arg);
 	for ( ; ; ) {
 
-		pthread_mutex_lock(&mlock);
+		//pthread_mutex_lock(&mlock);
 		printf("Escucho %d \n", (int) arg);
 		connfd_aux = accept(listenfd, (struct sockaddr*)NULL, NULL);
 		memset(sendBuff, '0', sizeof(sendBuff));
@@ -162,9 +165,9 @@ void *thread_main(void *arg) {
 			}
 		}
 		printf("\n\tEnd of tranmission\n");
-		pthread_mutex_unlock(&mlock);
+		//pthread_mutex_unlock(&mlock);
 		close(connfd_aux);
-		tptr[(int) arg].thread_count++;
+		//tptr[(int) arg].thread_count++;
 	}
 	free(req);
 	free(path);
@@ -176,7 +179,7 @@ void *thread_main(void *arg) {
 */
 void thread_make(int i)
 {
-	pthread_create(&tptr[i].thread_tid, NULL, &thread_main, (void *) i);
+	MY_THREAD_CREATE(&thread_main, &i);
 	return;                    
 }
 
@@ -215,7 +218,7 @@ int main(int argc, char **argv)
 
 	int nthreads = atoi(argv[2]); // Numero de threads
 
-	tptr = calloc(nthreads, sizeof(Thread));
+	//tptr = calloc(nthreads, sizeof(Thread));
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	memset(&serv_addr, '0', sizeof(serv_addr));
 
@@ -223,14 +226,33 @@ int main(int argc, char **argv)
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serv_addr.sin_port = htons(port);
         
-	pthread_t idHilo;
-	pthread_create(&idHilo, NULL, &CerrarServidor, NULL);
+	//pthread_t idHilo;
+	//pthread_create(&idHilo, NULL, &CerrarServidor, NULL);
 
 	bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
 	listen(listenfd, 1000); //listening to a maximum of 1000 connections
+	
+	//pthread_t thread_id[num_threads];
+	//#######################################################################
+	contador_t = 0;
+	join = 0;
+	Head = Current = NULL;        /* initialize pointers  */
+
+	if (setjmp(MAIN) == 0)        /* initialize scheduler */   
+        	Scheduler();
+   	//#######################################################################
+
 
 	for (i = 0;  i < nthreads; i++)
-		thread_make(i);       
+		thread_make(i);   
+    
+
+	//########################################################################
+	if(!join)
+		longjmp(SCHEDULER,1);         /* start scheduler      */
+	//########################################################################
+
+	MY_THREAD_JOIN();
 
 	for ( ; ; )
 		pause();                

@@ -2,21 +2,19 @@ CC=gcc
 FORK-WEBSERVER= fork-webserver.c
 THREAD-WEBSERVER= thread-webserver.c
 
-FLAGS= pthread
 
 OUTPUT=stress-client fork-webserver thread-webserver
 
 all: $(OUTPUT)
 
 fork-webserver: $(FORK-WEBSERVER)	
-	$(CC) -$(FLAGS) $(FORK-WEBSERVER) -o fork-webserver
+	$(CC) -o fork-webserver $(FORK-WEBSERVER)
 
 thread-webserver: $(THREAD-WEBSERVER)
-	$(CC) -$(FLAGS) $(THREAD-WEBSERVER) -o thread-webserver
+	$(CC) -o thread-webserver $(THREAD-WEBSERVER) mypthread.c
 	
 stress-client: stress-client.c
 	$(CC) -o stress-client stress-client.c mypthread.c
-	##$(CC) -$(FLAGS) stress-client.c -o stress-client
 	
 clean:
 	rm -f $(OUTPUT)
